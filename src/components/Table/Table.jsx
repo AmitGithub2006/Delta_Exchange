@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { TailSpin } from "react-loader-spinner";
+
 import "./Table.css";
-import {BallTriangle} from "react-loader-spinner";
+
 function Table() {
   const [symbol, setSymbol] = useState([]);
   const [mapData, setMapData] = useState([]);
@@ -10,11 +12,13 @@ function Table() {
 
   let newArr = [];
   let responseData = [];
+
+  const price = {};
+
   useEffect(() => {
     axios
       .get(`https://api.delta.exchange/v2/products`)
       .then((response) => {
-        console.log(response.data);
         responseData = [...new Set(response.data.result)];
         response.data.result.forEach((element) => {
           newArr.push(element.symbol);
@@ -23,8 +27,6 @@ function Table() {
         setSymbol([...newArr]);
       })
       .catch((err) => console.log(err));
-    console.log(newArr);
-
     function unsubscribe() {
       socket.onopen = function (e) {
         let data = {
@@ -38,35 +40,29 @@ function Table() {
             ],
           },
         };
-
         socket.send(JSON.stringify(data));
       };
       let counter = 0;
-
       socket.onmessage = function (event) {
-        console.log(counter);
         let eventData = JSON.parse(event.data);
         if (counter > newArr.length) {
           socket.close();
         }
         counter++;
-        for (let i = 0; i < responseData.length; i++) {
-          if (responseData[i].symbol === eventData.symbol) {
-            responseData[i] = {
-              ...responseData[i],
-              mark_price: eventData.mark_price,
-            };
-          }
-        }
-        setMapData([...responseData]);
-        console.log(eventData);
+        price[eventData.symbol] = eventData.mark_price;
       };
       socket.onclose = function () {
-        console.log("Socket closed");
+        for (let i = 0; i < responseData.length; i++) {
+          responseData[i] = {
+            ...responseData[i],
+            mark_price: price[responseData[i].symbol],
+          };
+        }
+        setMapData([...responseData]);
       };
       socket.onerror = function (event) {
-          console.log(event);
-      }
+        console.log(event);
+      };
     }
     unsubscribe();
   }, []);
@@ -74,16 +70,10 @@ function Table() {
   return (
     <>
       {!mapData[0] ? (
-        <BallTriangle
-          height={100}
-          width={100}
-          radius={5}
-          color="#4fa94d"
-          ariaLabel="ball-triangle-loading"
-          wrapperClass={{}}
-          wrapperStyle=""
-          visible={true}
-        />
+        <div className="loader">
+          <span>Loading...</span>
+          <TailSpin height={50} width={5000} />
+        </div>
       ) : (
         <table>
           <thead>
@@ -101,7 +91,7 @@ function Table() {
                   <td className="first-clmn">{symbol}</td>
                   <td>{description}</td>
                   <td>{underlying_asset.symbol}</td>
-                  <td>{mark_price}</td>
+                  <td className="mark-price">{mark_price}</td>
                 </tr>
               )
             )}
@@ -111,5 +101,4 @@ function Table() {
     </>
   );
 }
-
 export default Table;
